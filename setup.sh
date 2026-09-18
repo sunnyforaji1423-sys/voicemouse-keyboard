@@ -190,6 +190,13 @@ cat << 'EOF' > app/src/main/res/layout/keyboard_view.xml
             android:layout_height="48dp"
             android:layout_weight="1"
             android:text="↵"
+
+
+
+
+
+
+              
             android:textSize="18sp"
             android:textColor="#FFFFFF"
             android:backgroundTint="#A6E3A1"/>
