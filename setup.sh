@@ -1,3 +1,216 @@
+#!/bin/bash
+mkdir -p app/src/main/java/com/voicemouse/keyboard
+mkdir -p app/src/main/res/layout
+mkdir -p app/src/main/res/values
+mkdir -p app/src/main/res/xml
+mkdir -p gradle/wrapper
+
+cat << 'EOF' > app/build.gradle
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.voicemouse.keyboard'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.voicemouse.keyboard"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+}
+EOF
+
+cat << 'EOF' > app/src/main/AndroidManifest.xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@android:drawable/ic_btn_speak_now"
+        android:label="VoiceMouse Keyboard"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+
+        <!-- Launcher Activity: হোম স্ক্রিনে আইকন দেখানোর জন্য -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".VoiceInputMethodService"
+            android:label="VoiceMouse Keyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+    </application>
+</manifest>
+EOF
+
+cat << 'EOF' > app/src/main/res/xml/method.xml
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.voicemouse.keyboard.MainActivity" />
+EOF
+
+cat << 'EOF' > app/src/main/res/values/strings.xml
+<resources>
+    <string name="app_name">VoiceMouse Keyboard</string>
+</resources>
+EOF
+
+cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#181825">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🎙️ VoiceMouse Keyboard"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#CBA6F7"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="আপনার প্রিয় বহুভাষিক ভয়েস টাইপিং কিবোর্ড"
+        android:textSize="14sp"
+        android:textColor="#A6ADC8"
+        android:layout_marginBottom="36dp" />
+
+    <Button
+        android:id="@+id/btn_enable_keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="১. কিবোর্ডটি চালু করুন (Enable)"
+        android:textSize="16sp"
+        android:textColor="#181825"
+        android:backgroundTint="#89B4FA"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btn_select_keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="২. প্রধান কিবোর্ড সিলেক্ট করুন (Choose)"
+        android:textSize="16sp"
+        android:textColor="#181825"
+        android:backgroundTint="#A6E3A1"
+        android:layout_marginBottom="24dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="কিবোর্ড অন করার পর যেকোনো মেসেজিং অ্যাপে গিয়ে মাইক বাটনে ট্যাপ করে কথা বলুন।"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:textColor="#6C7086" />
+
+</LinearLayout>
+EOF
+
+cat << 'EOF' > app/src/main/java/com/voicemouse/keyboard/MainActivity.java
+package com.voicemouse.keyboard;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        Button btnEnable = findViewById(R.id.btn_enable_keyboard);
+        Button btnSelect = findViewById(R.id.btn_select_keyboard);
+
+        // সরাসরি ফোনের কিবোর্ড ম্যানেজমেন্ট সেটিংসে নিয়ে যাবে
+        btnEnable.setOnClickListener(v -> {
+            Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
+            startActivity(intent);
+        });
+
+        // কিবোর্ড পরিবর্তনের পপ-আপ ডায়ালগ ওপেন করবে
+        btnSelect.setOnClickListener(v -> {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showInputMethodPicker();
+            }
+        });
+    }
+}
+EOF
+
+cat << 'EOF' > app/src/main/res/layout/keyboard_view.xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#1E1E2E"
+    android:padding="8dp">
+
+    <!-- Language Selector Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="4">
+
+        <Button
             android:id="@+id/btn_lang_bn"
             android:layout_width="0dp"
             android:layout_height="40dp"
@@ -50,7 +263,7 @@
             android:layout_width="160dp"
             android:layout_height="60dp"
             android:text="🎤"
-            android:textSize="22sp"
+            android:textSize="20sp"
             android:backgroundTint="#89B4FA"
             android:textColor="#1E1E2E" />
     </LinearLayout>
@@ -100,6 +313,8 @@ cat << 'EOF' > app/src/main/java/com/voicemouse/keyboard/VoiceInputMethodService
 package com.voicemouse.keyboard;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.inputmethodservice.InputMethodService;
 import android.os.Bundle;
 import android.os.Handler;
@@ -171,6 +386,23 @@ public class VoiceInputMethodService extends InputMethodService {
         return view;
     }
 
+    private void updateMicUI(boolean listening) {
+        if (mainHandler == null) return;
+        mainHandler.post(() -> {
+            if (btnMic != null) {
+                if (listening) {
+                    btnMic.setText("🔴 শুনছি...");
+                    btnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#F38BA8")));
+                    btnMic.setTextColor(Color.WHITE);
+                } else {
+                    btnMic.setText("🎤");
+                    btnMic.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#89B4FA")));
+                    btnMic.setTextColor(Color.parseColor("#1E1E2E"));
+                }
+            }
+        });
+    }
+
     private void startVoiceRecognition() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_SHORT).show();
@@ -192,7 +424,7 @@ public class VoiceInputMethodService extends InputMethodService {
             @Override
             public void onReadyForSpeech(Bundle params) {
                 isListening = true;
-                if (btnMic != null) btnMic.setText("🔴 শুনছি...");
+                updateMicUI(true);
             }
 
             @Override
@@ -207,13 +439,13 @@ public class VoiceInputMethodService extends InputMethodService {
             @Override
             public void onEndOfSpeech() {
                 isListening = false;
-                if (btnMic != null) btnMic.setText("🎤");
+                updateMicUI(false);
             }
 
             @Override
             public void onError(int error) {
                 isListening = false;
-                if (btnMic != null) btnMic.setText("🎤");
+                updateMicUI(false);
                 String errorMsg = "ত্রুটি কোড: " + error;
                 if (error == SpeechRecognizer.ERROR_NO_MATCH) errorMsg = "কিছু শুনতে পায়নি, আবার চেষ্টা করুন";
                 else if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) errorMsg = "ইন্টারনেট সংযোগ চেক করুন";
@@ -223,7 +455,7 @@ public class VoiceInputMethodService extends InputMethodService {
             @Override
             public void onResults(Bundle results) {
                 isListening = false;
-                if (btnMic != null) btnMic.setText("🎤");
+                updateMicUI(false);
                 ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (matches != null && !matches.isEmpty()) {
                     String recognizedText = matches.get(0);
@@ -241,6 +473,8 @@ public class VoiceInputMethodService extends InputMethodService {
             public void onEvent(int eventType, Bundle params) {}
         });
 
+        isListening = true;
+        updateMicUI(true);
         mainHandler.post(() -> speechRecognizer.startListening(intent));
     }
 
@@ -249,7 +483,7 @@ public class VoiceInputMethodService extends InputMethodService {
             speechRecognizer.stopListening();
         }
         isListening = false;
-        if (btnMic != null) btnMic.setText("🎤");
+        updateMicUI(false);
     }
 
     @Override
